@@ -1,0 +1,2 @@
+$ claude -p "ping toolkit" --model sonnet   (fresh session, cwd = scratch dir, 2026-11-07)
+PONG-114. The toolkit-ping skill was loaded, so the toolkit skills are available.

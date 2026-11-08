@@ -1,0 +1,4 @@
+node_modules/
+# Course pages are the instructors', kept locally for the checker only
+briefs/
+.DS_Store
