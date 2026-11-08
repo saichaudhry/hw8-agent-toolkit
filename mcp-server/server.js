@@ -34,10 +34,20 @@ const cents = (s) => (s === undefined || s === null || s === "" ? null : Math.ro
 const num = (s) => Math.round(parseFloat(s || 0)).toLocaleString("en-US");
 const isOpen = (m) => m.status === "active" || m.status === "open";
 
+// Kalshi titles use city names ("Los Angeles C", "Buffalo"), never nicknames. v1 had no mapping, and an
+// agent asked about "the Bills" guessed contains="BAL" (Baltimore). Map nicknames to Kalshi team codes.
+const NFL = {
+  cardinals: "ARI", falcons: "ATL", ravens: "BAL", bills: "BUF", panthers: "CAR", bears: "CHI", bengals: "CIN",
+  browns: "CLE", cowboys: "DAL", broncos: "DEN", lions: "DET", packers: "GB", texans: "HOU", colts: "IND",
+  jaguars: "JAC", chiefs: "KC", chargers: "LAC", rams: "LAR", raiders: "LV", dolphins: "MIA", vikings: "MIN",
+  patriots: "NE", saints: "NO", giants: "NYG", jets: "NYJ", eagles: "PHI", steelers: "PIT", seahawks: "SEA",
+  "49ers": "SF", niners: "SF", buccaneers: "TB", bucs: "TB", titans: "TEN", commanders: "WAS",
+};
+
 function matches(m, needle) {
   if (!needle) return true;
   const hay = [m.ticker, m.event_ticker, m.title, m.yes_sub_title, m.no_sub_title].join(" ").toLowerCase();
-  return needle.toLowerCase().split(/\s+/).every((w) => hay.includes(w));
+  return needle.toLowerCase().split(/\s+/).every((w) => hay.includes((NFL[w] || w).toLowerCase()));
 }
 
 function fmtMarket(m) {
@@ -48,7 +58,10 @@ function fmtMarket(m) {
   return `  ${m.ticker}  "${label}"  ${quote}  last ${last ?? "-"}c  vol ${num(m.volume_fp)}  OI ${num(m.open_interest_fp)}  [${m.status}] closes ${m.close_time}${result}`;
 }
 
-function render(header, events, shown, total) {
+const RAW_KEYS = ["ticker", "event_ticker", "title", "yes_sub_title", "status", "yes_bid_dollars", "yes_ask_dollars",
+  "last_price_dollars", "volume_fp", "open_interest_fp", "close_time", "result"];
+
+function render(header, events, shown, total, raw) {
   const lines = [header, "Prices: YES side, in cents (converted from Kalshi's dollar strings). vol/OI in contracts.", ""];
   for (const ev of events) {
     if (!ev.markets.length) continue;
@@ -56,10 +69,16 @@ function render(header, events, shown, total) {
     for (const m of ev.markets) lines.push(fmtMarket(m));
   }
   if (shown < total) lines.push("", `Showing ${shown} of ${total} matching markets. Narrow with 'contains' or raise 'limit'.`);
+  const first = events.find((e) => e.markets.length)?.markets[0];
+  if (raw && first) {
+    lines.push("", `For code: GET ${BASE}/markets?event_ticker=<EVENT> (or /events?series_ticker=<SERIES>&with_nested_markets=true).`,
+      "Raw API fields for the first market above (prices are dollar STRINGS, sizes are float STRINGS):",
+      JSON.stringify(Object.fromEntries(RAW_KEYS.map((k) => [k, first[k]])), null, 2));
+  }
   return lines.join("\n");
 }
 
-async function lookup({ ticker, contains, status, limit }) {
+async function lookup({ ticker, contains, status, limit, raw }) {
   const t = ticker.trim().toUpperCase();
   const wantOpen = status === "open";
 
@@ -67,14 +86,14 @@ async function lookup({ ticker, contains, status, limit }) {
   const mk = await get(`/markets/${encodeURIComponent(t)}`);
   if (mk?.market) {
     const ev = await get(`/events/${encodeURIComponent(mk.market.event_ticker)}`);
-    return render(`Kalshi market ${t}`, [{ ...(ev?.event ?? { event_ticker: mk.market.event_ticker }), markets: [mk.market] }], 1, 1);
+    return render(`Kalshi market ${t}`, [{ ...(ev?.event ?? { event_ticker: mk.market.event_ticker }), markets: [mk.market] }], 1, 1, raw);
   }
 
   // 2) An event ticker, e.g. KXNFLGAME-26NOV16LACBAL (all markets in one game/question)
   const ev = await get(`/events/${encodeURIComponent(t)}`);
   if (ev?.event) {
     const all = (ev.markets || []).filter((m) => (wantOpen ? isOpen(m) : true) && matches(m, contains));
-    return render(`Kalshi event ${t}: ${all.length} ${wantOpen ? "open " : ""}markets`, [{ ...ev.event, markets: all.slice(0, limit) }], Math.min(limit, all.length), all.length);
+    return render(`Kalshi event ${t}: ${all.length} ${wantOpen ? "open " : ""}markets`, [{ ...ev.event, markets: all.slice(0, limit) }], Math.min(limit, all.length), all.length, raw);
   }
 
   // 3) A series ticker, e.g. KXNFLGAME (every game in the league)
@@ -99,33 +118,34 @@ async function lookup({ ticker, contains, status, limit }) {
       cursor = page.cursor;
     } while (cursor && scanned < MAX_SCAN);
     if (!total) return `Series ${t} (${series.series.title}) exists but has no ${wantOpen ? "open " : ""}markets${contains ? ` matching "${contains}"` : ""}.`;
-    return render(`Kalshi series ${t} (${series.series.title}): ${total} ${wantOpen ? "open " : ""}markets${contains ? ` matching "${contains}"` : ""}`, events, shown, total);
+    return render(`Kalshi series ${t} (${series.series.title}): ${total} ${wantOpen ? "open " : ""}markets${contains ? ` matching "${contains}"` : ""}`, events, shown, total, raw);
   }
 
   return `No Kalshi market, event, or series is named "${t}". Tickers look like SERIES (KXNFLGAME), ` +
     `SERIES-EVENT (KXNFLGAME-26NOV16LACBAL), or SERIES-EVENT-OUTCOME (KXNFLGAME-26NOV16LACBAL-LAC).`;
 }
 
-const server = new McpServer({ name: "kalshi-lookup", version: "1.0.0" });
+const server = new McpServer({ name: "kalshi-lookup", version: "2.0.0" });
 
 server.registerTool(
   "kalshi_lookup",
   {
     title: "Kalshi market lookup",
     description:
-      "Look up live prices on Kalshi (a US prediction-market exchange) from its public API. " +
-      "Use this instead of guessing whenever you need current Kalshi odds, the exact ticker for a market, " +
-      "or what fields/prices a Kalshi market really has. Pass any ticker level: a series like KXNFLGAME " +
-      "(NFL game winners; also KXNFLSPREAD, KXNFLTOTAL, KXNBAGAME, KXNCAAFGAME, KXMLBGAME), an event like " +
-      "KXNFLGAME-26NOV16LACBAL (one game: YYMONDD + away + home team codes), or a single market like " +
-      "KXNFLGAME-26NOV16LACBAL-LAC. Use 'contains' to filter by team code or name (e.g. 'BAL' or 'Baltimore'). " +
-      "Returns YES bid/ask/last in cents, volume, open interest, status and close time, grouped by event. " +
-      "Read-only, no account access.",
+      "Live data from Kalshi's public prediction-market API (read-only, no key). Call this BEFORE writing or " +
+      "debugging any code that talks to Kalshi, instead of curl/urllib or guessing from memory: it shows the real " +
+      "tickers that exist right now and, with raw=true, the exact raw JSON field names and formats your code must " +
+      "parse (prices are dollar strings like \"0.4600\", not integer cents). Also use it for any question about " +
+      "current Kalshi prices or odds. Ticker levels: series KXNFLGAME (NFL winners; also KXNFLSPREAD, KXNFLTOTAL, " +
+      "KXNBAGAME, KXNCAAFGAME, KXMLBGAME), event KXNFLGAME-26NOV16LACBAL (one game: YYMONDD + away + home team " +
+      "codes), market KXNFLGAME-26NOV16LACBAL-LAC. 'contains' filters by team code, city, or nickname " +
+      "('BUF', 'Buffalo', or 'Bills'). Returns YES bid/ask/last in cents, volume, open interest, status, close time.",
     inputSchema: {
       ticker: z.string().min(2).describe("Kalshi series, event, or market ticker, e.g. KXNFLGAME"),
       contains: z.string().optional().describe("Case-insensitive filter on ticker/title/team, e.g. 'BAL'"),
       status: z.enum(["open", "any"]).default("open").describe("'open' (default) hides closed/settled markets"),
       limit: z.number().int().min(1).max(100).default(25).describe("Max markets to return"),
+      raw: z.boolean().default(false).describe("Also return the raw API JSON fields for one market (use when writing code)"),
     },
   },
   async (args) => {
