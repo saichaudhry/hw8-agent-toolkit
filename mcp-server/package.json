@@ -1,6 +1,6 @@
 {
   "name": "kalshi-lookup-mcp",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "One-tool MCP server: read-only lookup of Kalshi public market data",
   "type": "module",
   "main": "server.js",

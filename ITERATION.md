@@ -36,4 +36,17 @@ FACTS:
 - **Coding didn't:** Run 1 worker (Opus, `~/p3-line-tracker`, "build snapshot.py from SPEC.md…") made **0 calls** to `kalshi_lookup`, even though the server was `connected`. It tried `curl` (blocked) and then hand-wrote `urllib` probes of the raw API (`transcripts/run1-worker.md`).
 - **Diagnosis:** v1's description sold the tool as "look up live prices / odds", which suits a question, not "I'm about to write code". And its output hid the raw field names (`yes_bid_dollars`…), which are exactly what someone writing code needs, so the tool really was less useful than raw curl for coding. Kalshi titles use city names, so "Bills" matched nothing, and the agent guessed a code.
 - **Change (v2):** description now starts with "Call this BEFORE writing or debugging any code that talks to Kalshi, instead of curl/urllib or guessing"; a new `raw: true` option returns the real JSON field names/format plus the endpoint to call; nicknames → team codes (`Bills` → BUF).
-- **Rerun:** identical prompt on a fresh clone at the spec-only commit, fresh Opus session → RERUN_RESULT_PLACEHOLDER (`transcripts/rerun-mcp-v2-worker.md`).
+- **Rerun of v2 was itself a failure (two of them):**
+  - My first rerun was invalid: `git clone` brought along Run 1's `snapshot-py` branch, so the agent merged the old `snapshot.py` instead of writing one (kept as `transcripts/rerun-mcp-v2-INVALID-clone-had-old-branch.md`). Re-done on a `--single-branch` clone with no remote.
+  - Clean v2 rerun (`transcripts/rerun-mcp-v2-clean-worker.md`): it **still went to `curl` first** (3 attempts, all blocked by permissions) and only then searched for and used `kalshi_lookup` (4 calls, `raw: true`). So the better description helped once the agent looked, but it didn't make the agent look.
+- **Real diagnosis:** the session's init event lists the tool next to `ToolSearch`. Claude Code **defers MCP tools**: the model sees only the name `mcp__kalshi-lookup__kalshi_lookup` until it runs ToolSearch, so **my description never reached the model when it decided how to start**. Rewriting the docstring couldn't fix discovery.
+- **Change (v3):** added server-level `instructions` to the `McpServer` constructor ("Whenever a task involves Kalshi … call kalshi_lookup before using curl, urllib, or memory"). Claude Code always puts server instructions in the system prompt.
+- **Rerun of v3** (`transcripts/rerun-mcp-v3-worker.md`), same prompt, clean clone, fresh Opus: after `ls`/`cat SPEC.md`, its **first action was ToolSearch → `kalshi_lookup`**, with 3 calls (`KXNFLGAME`/`KXNFLSPREAD`/`KXNFLTOTAL`, `contains: "BUF"`, `raw: true`) and **zero curl attempts**.
+- Caveat: one run per version (n=1 each); the v1→v3 difference is clear, but this isn't a statistic.
+- Summary table:
+
+| Version | Change | kalshi_lookup calls | curl/urllib probes before it |
+|---|---|---|---|
+| v1 | original | 0 | all of them (urllib) |
+| v2 | coding-first description, `raw`, nicknames | 4 | 3 blocked curls first |
+| v3 | + server `instructions` | 3 (first action) | 0 |

@@ -125,7 +125,18 @@ async function lookup({ ticker, contains, status, limit, raw }) {
     `SERIES-EVENT (KXNFLGAME-26NOV16LACBAL), or SERIES-EVENT-OUTCOME (KXNFLGAME-26NOV16LACBAL-LAC).`;
 }
 
-const server = new McpServer({ name: "kalshi-lookup", version: "2.0.0" });
+// v3: Claude Code defers MCP tools, so the model sees only the tool NAME until it runs ToolSearch, and
+// the description above never reaches it. Server `instructions` are always put in the system prompt.
+const server = new McpServer(
+  { name: "kalshi-lookup", version: "3.0.0" },
+  {
+    instructions:
+      "kalshi_lookup gives live, read-only data from Kalshi's public API. Whenever a task involves Kalshi " +
+      "(writing or debugging code that calls the Kalshi API, or answering questions about Kalshi markets or prices), " +
+      "call kalshi_lookup before using curl, urllib, or memory: use raw=true to see the exact tickers, endpoint, " +
+      "and raw JSON field names/formats (prices are dollar strings like \"0.4600\"). Team nicknames work in 'contains'.",
+  },
+);
 
 server.registerTool(
   "kalshi_lookup",
