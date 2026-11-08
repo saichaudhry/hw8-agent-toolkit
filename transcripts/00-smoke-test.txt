@@ -1,2 +1,5 @@
 $ claude -p "ping toolkit" --model sonnet   (fresh session, cwd = scratch dir, 2026-11-07)
 PONG-114. The toolkit-ping skill was loaded, so the toolkit skills are available.
+
+$ claude -p "ping toolkit" --model opus   (fresh session, 2026-11-08, Claude Code 2.1.319)
+PONG-114: the toolkit-ping skill loaded, so the HW8 toolkit skills are available.

@@ -94,7 +94,7 @@ VERDICT: NOT READY — the student-written "Why I'm building this" section in RE
 
 > TODO (your words)
 
-FACTS: The skill triggered on its own in **all 5** checker sessions (run1, run1-rerun, run2, The Sharp v1, The Sharp v2), each from
+FACTS: The skill triggered on its own in **all 6** checker sessions (run1, run1-rerun, run2, The Sharp v1, The Sharp v2, and the HW8 self-check in `transcripts/hw8-self-check.md`), each from
 a plain "is this ready to submit" prompt and never by name. After v2, every report used the same format (header naming the brief,
 labeled lines with file:line, PLACEHOLDERS, DO YOURSELF, VERDICT). None of the checker sessions modified any file.
 

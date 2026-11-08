@@ -94,7 +94,7 @@ args = ["/ABSOLUTE/PATH/TO/hw8-agent-toolkit/mcp-server/server.js"]
 
 > TODO (your words)
 
-FACTS: Claude Code CLI 2.x on macOS. Skill confirmed loading on Sonnet 5.5 and Opus 5.5; MCP tool confirmed called by Sonnet 5.5 and Opus 5.5 (`transcripts/01-mcp-call-check.md`, `transcripts/rerun-mcp-v2-worker.md`). **Codex was NOT tested** (it isn't installed on this machine). Only list Codex if you test it yourself.
+FACTS: Claude Code CLI 2.1.319 on macOS. `submission-check` was exercised only on Sonnet 5.5 (all 6 checker sessions); skill loading in general was confirmed on Opus 5.5 too, via the toolkit-ping smoke test (`transcripts/00-smoke-test.txt`); MCP tool confirmed called by Sonnet 5.5 and Opus 5.5 (`transcripts/01-mcp-call-check.md`, `transcripts/rerun-mcp-v2-worker.md`). **Codex was NOT tested** (it isn't installed on this machine). Only list Codex if you test it yourself.
 
 ## Borrowed / adapted
 
