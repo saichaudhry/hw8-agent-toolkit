@@ -1,9 +1,5 @@
 # HW8 Agent Toolkit: `submission-check` + `kalshi-lookup`
 
-> ⚠️ **TODO (your words): this whole README must be written by Sai, not AI (HW8 "What to Submit").**
-> Everything under a "FACTS" block is raw material Claude verified. Rewrite it in your own words and delete the FACTS blocks.
-> The install commands are fine to keep as-is.
-
 ## What's in here
 
 | Path | What it is |
@@ -16,36 +12,33 @@
 
 ## The skill: `submission-check`
 
-> TODO (your words): what it does and when it triggers.
-
-FACTS (delete after rewriting):
-- Reads the brief (user-named file → `ASSIGNMENT.md` → `SPEC.md` → any root .md with a Deliverables/Requirements/Acceptance criteria heading), labels each deliverable PRESENT / PARTIAL / MISSING / CAN'T VERIFY with file:line evidence, lists leftover placeholders (`TODO`, `your words`, `Edit it into your own voice`...), a DO YOURSELF checklist for off-repo items, and a READY / NOT READY verdict.
-- Never edits files, never prints secret values, never opens `.env*`.
-- Triggered on its own (no slash command) in a fresh Sonnet session from the plain prompt "is this ready to submit".
+I use submission-check when I want to know whether a project is ready to turn in. I can type “is this ready to submit,” and it reads the assignment brief or SPEC, labels each requirement PRESENT, PARTIAL, MISSING, or CAN’T VERIFY, and points to evidence in the files. It also flags leftover TODOs and unfinished AI drafts, then gives a READY or NOT READY verdict. It only reports what it finds and never edits files.
 
 ## The MCP tool: `kalshi_lookup`
 
-> TODO (your words): what it does.
+kalshi_lookup gives the agent live data from Kalshi’s public API without an API key or account access. Given a series, event, or market ticker, it returns prices in cents, volume, and close time; `raw: true` also includes the actual JSON fields for writing code. This lets the agent inspect current data and field names instead of relying on memory.
 
-FACTS:
-- Read-only lookup against Kalshi's **public** API (no key, GET only, no account access).
-- Takes any ticker level: series `KXNFLGAME`, event `KXNFLGAME-26NOV16LACBAL`, or market `KXNFLGAME-26NOV16LACBAL-LAC`. Optional `contains` (team code, city, or nickname like "Bills"), `status` (open/any), `limit`, `raw` (also return the raw JSON field names, for writing code).
-- Returns YES bid/ask/last converted to cents, volume, open interest, status, close time, grouped by event.
+## Why I built these
 
-## Why I built these (evidence from my prompt logs)
+I built these tools because the same problems kept showing up in my projects. I would get the main functionality working, but unfinished documentation could still make it into the submission. In Project 2, I asked:
 
-> TODO (your words): the friction, plus 2–3 quoted lines.
+> “is this ready to submit”
 
-FACTS (quotes are verbatim from your logs):
-- Checker:
-  - `~/.claude/projects` session 23adc771, 2026-10-07 (Project 2): you pasted the brief with *"is this ready to submit"*. `the-sharp/prompt_log.md:5` still says *"TODO (your words): which tool for which job and why."*
-  - `kalshi-nfl-board/prompt_log.md:5` (HW3): *"Note: this is a draft record produced at the end of the session. Edit it into your own voice"* is still in the file.
-  - `the-sharp-classic/README.md` and `prompt_log.md` still have the same TODO markers.
-  - `hw6-122-tutor/prompt_log.md:68`: *"what is read me sections 1-4 list it here , and how i used ai paragaph"*
-  - `pocket-shuffle-pool-phase2/prompt_log.md:10` (HW7): *"maek sure to do the whole repo clone thing it isntructs on the assignement doc"*
-- MCP:
-  - `kalshi-nfl-board/prompt_log.md:104` (HW3): *"Prices are strings in dollars, not integer cents. Code written from memory would have rendered an entire page of `—` without erroring."*
-  - Kalshi came back in HW3, HW4 (gridiron-ask-backend), and Project 2 (`the-sharp`: *"use kalshi api, i hvae stored pull it"*), and every time the agent had to rediscover tickers and fields.
+But `the-sharp/prompt_log.md:5` still contained:
+
+> “TODO (your words): which tool for which job and why.”
+
+That is the gap I want the checker to catch. Asking an agent whether something is ready is more useful when it follows a repeatable process, checks the actual requirements, and shows evidence for its answers.
+
+Kalshi caused a different recurring problem. My HW3 log, `kalshi-nfl-board/prompt_log.md:104-105`, says:
+
+> “Prices are strings in dollars, not integer cents. Code written from memory would have rendered an entire page of — without erroring.”
+
+Kalshi came up again in HW4 and Project 2, where I typed (`the-sharp/prompt_log.md:67`):
+
+> “use kalshi api, i hvae stored pull it”
+
+so rediscovering its tickers and response fields was repeated work. The MCP tool adds new reach because it can fetch live information that instructions alone cannot provide. The checker gives the agent a more consistent review process; the MCP tool gives it access to current external data.
 
 ## Install
 
@@ -83,7 +76,7 @@ Or as JSON (`.mcp.json` in a project root):
 { "mcpServers": { "kalshi-lookup": { "command": "node", "args": ["/ABSOLUTE/PATH/TO/hw8-agent-toolkit/mcp-server/server.js"] } } }
 ```
 
-**Codex** (`~/.codex/config.toml`, use forward slashes):
+**Codex** (`~/.codex/config.toml`, use forward slashes; not tested, see below):
 ```toml
 [mcp_servers.kalshi-lookup]
 command = "node"
@@ -92,18 +85,12 @@ args = ["/ABSOLUTE/PATH/TO/hw8-agent-toolkit/mcp-server/server.js"]
 
 ## Where I confirmed it works
 
-> TODO (your words)
-
-FACTS: Claude Code CLI 2.1.319 on macOS. `submission-check` was exercised only on Sonnet 5.5 (all 6 checker sessions); skill loading in general was confirmed on Opus 5.5 too, via the toolkit-ping smoke test (`transcripts/00-smoke-test.txt`); MCP tool confirmed called by Sonnet 5.5 and Opus 5.5 (`transcripts/01-mcp-call-check.md`, `transcripts/rerun-mcp-v2-worker.md`). **Codex was NOT tested** (it isn't installed on this machine). Only list Codex if you test it yourself.
+The recorded tests used Claude Code 2.1.319 on macOS. The checker was tested on Sonnet, and both Sonnet and Opus called the MCP tool successfully; these tests do not establish that the toolkit works in Codex.
 
 ## Borrowed / adapted
 
-> TODO (your words)
-
-FACTS: The output-format line and the "cite a file and line for every PRESENT" rule are adapted from the HW8 page's `spec-check` example. The server structure follows the MCP TypeScript SDK `McpServer` + `StdioServerTransport` quickstart. No third-party skills were installed.
+I adapted the report format and the rule requiring file-and-line evidence for every PRESENT item from the course’s spec-check example. The server structure follows the MCP TypeScript SDK quickstart using `McpServer` and `StdioServerTransport`; no third-party skills were installed.
 
 ## How I used AI
 
-> TODO (your words), with citations.
-
-FACTS: Claude Code (Opus 5.5) in one terminal session: mined your prompt logs and old sessions for evidence, recovered the HW6/HW7/Project 2 briefs from session history, wrote the skill/server drafts from your choices (you picked submission-check + Kalshi from evidence-backed options), ran every worker/checker run as a separate headless `claude -p` process (worker = Opus, checker = Sonnet), and wrote these skeletons. It did not write the README/DEMONSTRATION/ITERATION prose.
+I used Claude Code to find evidence in my earlier logs, draft the skill and server from the options I selected, run separate worker and checker sessions, and create the documentation skeletons. I chose the submission checker, the Kalshi tool, and the line-tracker demo task. The development and testing transcripts are in `transcripts/`, including `run1-worker.md`, `rerun-skill-v2-p3-checker.md`, `run2-worker.md`, and `run2-checker.md`.

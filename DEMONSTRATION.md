@@ -1,18 +1,8 @@
 # DEMONSTRATION: the toolkit on real work
 
-> ⚠️ **TODO (your words): this file must be written by Sai (HW8 "What to Submit").** Claude ran the sessions and
-> gathered the trimmed transcript excerpts below. **The "Do I agree?" parts can only come from you.** Read the
-> checker reports in `transcripts/run1-checker.md` and `transcripts/run2-checker.md` and decide for yourself.
-
 ## The task
 
-> TODO (your words): what the task was and why it's real.
-
-FACTS: Project 3 groundwork, a Kalshi NFL line tracker (`~/p3-line-tracker`, local only, not pushed). `SPEC.md` has 4 deliverables
-and 5 acceptance criteria. Run 1 = `snapshot.py` (criteria 1–3). Run 2 = `report.py` + README run instructions (criteria 4–5).
-Setup for every run: the worker is a fresh `claude -p` on **Opus 5.5**; the checker is a separate fresh `claude -p` on **Sonnet 5.5**
-in the same repo after the worker finished, with no shared context. Raw logs are `transcripts/*.jsonl`; trimmed versions are `*.md`
-(made by `transcripts/summarize.py`).
+The demo is a Kalshi NFL line tracker that records prices over time so I can see how lines move before kickoff. It is real groundwork for Project 3: Run 1 built snapshot.py for acceptance criteria 1–3, and Run 2 added report.py and README instructions for criteria 4–5. Each worker ran in a fresh Opus session, followed by a separate fresh Sonnet checker session in the same repository with no shared conversation context.
 
 ## Run 1: `snapshot.py`
 
@@ -52,8 +42,17 @@ SPEC.md:3 "Drafted with Claude from Sai's choices ... Edit before treating as fi
 VERDICT: NOT READY — report.py and README.md are missing ..., and SPEC.md still has its AI-draft note.
 ```
 
-> TODO (your words): what did the checker catch? Do you agree? (For example: MISSING for report.py is expected, since Run 1
-> didn't build it. Is flagging your own SPEC banner fair? It said it read AC3's code but didn't run it. Is that good enough?)
+### What the checker caught and whether I agree
+
+After the skill fix, the checker correctly identified that report.py and README.md were missing. That was expected because Run 1 only asked the worker to build the snapshot script. I agree with NOT READY for the whole project, even though those missing files did not mean the worker failed its narrower task.
+
+Flagging the SPEC banner was fair because it explicitly said “Edit before treating as final.” The issue is the unfinished review instruction, not simply that Claude helped draft the file.
+
+For AC3, the checker read the invalid-team handling code but did not execute it. That supports a code-review finding, but I would want an actual run before treating the behavior as fully verified. The report disclosed the limitation, although its PRESENT label could make the result look stronger than the evidence.
+
+The worker also made zero MCP calls in Run 1 despite the server being connected. It used raw API requests instead, which became the tool-discovery failure described in ITERATION.md.
+
+Evidence: `transcripts/rerun-skill-v2-p3-checker.md` and `transcripts/run1-worker.md`.
 
 ## Run 2: `report.py` + README run instructions
 
@@ -86,17 +85,19 @@ README.md:88 "## Why I'm building this" (heading is empty)
 VERDICT: NOT READY — the student-written "Why I'm building this" section in README.md is empty, and SPEC.md still has its AI-draft banner.
 ```
 
-> TODO (your words): what did it catch, and do you agree? Things worth an opinion: it labeled the run instructions
-> **PARTIAL** while calling them "present and complete" (a labeling mistake?). It accepted AC5 from reading code without
-> running it. It made no edits (`git status` was clean afterward).
+### Do I agree?
+
+Run 2 used kalshi_lookup three times, and the worker reported checking the snapshot against live moneyline, spread, and total data. The checker then caught the empty “Why I’m building this” section, which the worker had deliberately left for me.
+
+I agree with NOT READY because a required section was still unfinished. However, labeling the run instructions PARTIAL while describing them as “present and complete” was inconsistent. The instructions should have been PRESENT, with the separate personal explanation marked incomplete.
+
+The checker also accepted AC5 by reading the missing-data handling code without testing an empty or missing CSV. That is useful evidence, but it does not fully verify the behavior. I would prefer a test in a temporary copy so the real data stays untouched. The checker made no edits, and the working tree remained clean.
+
+Evidence: `transcripts/run2-worker.md` and `transcripts/run2-checker.md`.
 
 ## Consistency across runs
 
-> TODO (your words)
-
-FACTS: The skill triggered on its own in **all 6** checker sessions (run1, run1-rerun, run2, The Sharp v1, The Sharp v2, and the HW8 self-check in `transcripts/hw8-self-check.md`), each from
-a plain "is this ready to submit" prompt and never by name. After v2, every report used the same format (header naming the brief,
-labeled lines with file:line, PLACEHOLDERS, DO YOURSELF, VERDICT). None of the checker sessions modified any file.
+The skill triggered automatically in all six checker sessions, used the same report structure after v2, and never modified files. That gives me confidence in its triggering, format, and report-only behavior. Its judgments were less consistent: the contradictory PARTIAL label and acceptance of unexecuted behavior show why I still need to review the evidence behind each verdict.
 
 ## Bonus: checking real past work
 

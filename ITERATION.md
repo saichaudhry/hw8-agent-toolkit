@@ -1,50 +1,40 @@
 # ITERATION: what broke and how I fixed it
 
-> ⚠️ **TODO (your words): the assignment says this file must be written by Sai.** Below are the verified facts and
-> where to find the evidence. Pick the failure(s) you want to tell, write the story yourself, and delete the FACTS blocks.
-> The diffs are in git: `git show 6b14b05:skills/submission-check/SKILL.md` (v1) vs the current file (v2); same for `mcp-server/server.js`.
+The before/after versions are in git: `git show 6b14b05:skills/submission-check/SKILL.md` (v1) vs the current file, and the same for `mcp-server/server.js` (v1 in `6b14b05`, v2 in `158ce05`, v3 in `81f1f23`).
 
-## Failure 1 (skill): v1 was too rigid and refused to run
+## Failure 1: The skill was too rigid
 
-> TODO (your words): what went wrong, your diagnosis, what you changed, and the rerun result.
+The first version triggered correctly but refused to check the project because it could not find ASSIGNMENT.md. The requirements were already in SPEC.md, but my rule only accepted ASSIGNMENT.md or a brief explicitly named by the user.
 
-FACTS:
-- **What happened:** Fresh Sonnet session in `~/p3-line-tracker`, prompt "is this ready to submit". The skill **did trigger on its own** (`TOOL Skill: submission-check`), but then it stopped and produced no report:
-  > "I can't run the check yet because there's no assignment brief. The repo has no `ASSIGNMENT.md`. The only markdown file is `SPEC.md`, which looks like your own project notes … I won't guess what's required."
-  (`transcripts/run1-checker.md`)
-- **Why:** v1 said "`ASSIGNMENT.md` in the repo root, or a file/URL the user names. If there is no brief, stop and ask." My own projects use `SPEC.md` (HW7 and the course's spec-check example), so the anti-guessing rule I added on purpose made the skill useless on my real repos.
-- **Change (v2):** a lookup order (user-named → `ASSIGNMENT.md` → `SPEC.md` → any root .md with a Deliverables/Requirements/Acceptance criteria heading), the header has to name the file it used, and it only stops if none exist.
-- **Rerun:** same prompt, same repo state, fresh Sonnet session → full report: `SUBMISSION CHECK: p3-line-tracker vs SPEC.md`, 9 labeled lines, and it caught `SPEC.md:3 "Drafted with Claude…"` as a placeholder (`transcripts/rerun-skill-v2-p3-checker.md`).
+I still think the anti-guessing rule was useful. The mistake was making the accepted source too narrow for how my projects actually work. I changed the lookup order to check a user-named file first, then ASSIGNMENT.md, then SPEC.md, and finally a root Markdown file with a Deliverables, Requirements, or Acceptance Criteria heading. The report also has to name the source it used.
 
-## Failure 2 (skill): marked things it can't see as MISSING, and printed a live API key
+In the fresh rerun, the same prompt produced a full report against SPEC.md, including the missing deliverables and unfinished draft banner. That fixed the refusal while keeping the requirement to ground the check in an identifiable brief.
 
-> TODO (your words)
+Evidence: `transcripts/run1-checker.md` and `transcripts/rerun-skill-v2-p3-checker.md`.
 
-FACTS (v1 on real past work: `~/the-sharp` vs the Project 2 brief recovered from session history; `transcripts/v1-thesharp-checker.md`):
-- Marked "Google form response", "Midpoint check-in", and "Link from the portfolio" as **MISSING**, even though it admitted "This isn't something the repo can show", and then used them in the NOT READY verdict.
-- Marked "Phone support" PRESENT with `README.md:15` as the evidence, which is just the README *claiming* it.
-- **Security:** its secret scan grepped the untracked `.env.local` and **printed the full Anthropic API key and Vercel OIDC token into its output**. (Redacted in the committed transcript; it was never pushed.) The report itself said "the untracked `.env.local` does hold a live Anthropic key…".
-- **Change (v2):** a new `CAN'T VERIFY` label (never MISSING) plus a "DO YOURSELF" checklist; the verdict is based only on PARTIAL/MISSING/placeholders; "a README sentence claiming it works is not evidence"; "Never print a secret's value. Do not open `.env*` files."
-- **Rerun** (`transcripts/rerun-skill-v2-thesharp-checker.md`): off-repo items are now CAN'T VERIFY with a 6-item checklist; phone support is cited from `src/styles.css:672-698`; the key grep piped through `sed … [redacted]`, and no key appears anywhere in the transcript. Verdict NOT READY for the right reasons: `README.md:5 "Demo: TODO"` and the prompt_log TODOs.
+## Failure 2: Unsupported judgments and a leaked key
 
-## Failure 3 (MCP tool): the agent never called it during real coding
+When I tested the checker on The Sharp, it marked the Google form, midpoint check-in, and portfolio link MISSING even though it could not verify those things from the repository. It also accepted a README claim as proof of phone support. Both problems came from treating limited evidence as enough for a definite answer.
 
-> TODO (your words)
+More seriously, its secret scan printed a live API key and an OIDC token from .env.local. A checker intended to catch problems created another problem through its output. That makes the course’s warning about third-party skills concrete for me: a skill’s helpful purpose does not guarantee that its instructions handle sensitive files safely.
 
-FACTS:
-- **Q&A worked:** asked "What does Kalshi currently have the Bills at…", Sonnet called `kalshi_lookup` 3× (`transcripts/01-mcp-call-check.md`). But its **first call was `contains: "BAL"`** (Baltimore, not Buffalo). It only corrected itself on the next call.
-- **Coding didn't:** Run 1 worker (Opus, `~/p3-line-tracker`, "build snapshot.py from SPEC.md…") made **0 calls** to `kalshi_lookup`, even though the server was `connected`. It tried `curl` (blocked) and then hand-wrote `urllib` probes of the raw API (`transcripts/run1-worker.md`).
-- **Diagnosis:** v1's description sold the tool as "look up live prices / odds", which suits a question, not "I'm about to write code". And its output hid the raw field names (`yes_bid_dollars`…), which are exactly what someone writing code needs, so the tool really was less useful than raw curl for coding. Kalshi titles use city names, so "Bills" matched nothing, and the agent guessed a code.
-- **Change (v2):** description now starts with "Call this BEFORE writing or debugging any code that talks to Kalshi, instead of curl/urllib or guessing"; a new `raw: true` option returns the real JSON field names/format plus the endpoint to call; nicknames → team codes (`Bills` → BUF).
-- **Rerun of v2 was itself a failure (two of them):**
-  - My first rerun was invalid: `git clone` brought along Run 1's `snapshot-py` branch, so the agent merged the old `snapshot.py` instead of writing one (kept as `transcripts/rerun-mcp-v2-INVALID-clone-had-old-branch.md`). Re-done on a `--single-branch` clone with no remote.
-  - Clean v2 rerun (`transcripts/rerun-mcp-v2-clean-worker.md`): it **still went to `curl` first** (3 attempts, all blocked by permissions) and only then searched for and used `kalshi_lookup` (4 calls, `raw: true`). So the better description helped once the agent looked, but it didn't make the agent look.
-- **Real diagnosis:** the session's init event lists the tool next to `ToolSearch`. Claude Code **defers MCP tools**: the model sees only the name `mcp__kalshi-lookup__kalshi_lookup` until it runs ToolSearch, so **my description never reached the model when it decided how to start**. Rewriting the docstring couldn't fix discovery.
-- **Change (v3):** added server-level `instructions` to the `McpServer` constructor ("Whenever a task involves Kalshi … call kalshi_lookup before using curl, urllib, or memory"). Claude Code always puts server instructions in the system prompt.
-- **Rerun of v3** (`transcripts/rerun-mcp-v3-worker.md`), same prompt, clean clone, fresh Opus: after `ls`/`cat SPEC.md`, its **first action was ToolSearch → `kalshi_lookup`**, with 3 calls (`KXNFLGAME`/`KXNFLSPREAD`/`KXNFLTOTAL`, `contains: "BUF"`, `raw: true`), before any curl or urllib.
-- **But it still went back to the raw API afterward:** 1 blocked curl, then several `urllib` probes. It said why: "I'm checking which team codes Kalshi uses before I write snapshot.py." It wanted the full list of all 32 team codes and complete event data (`limit=1000`), and the tool can't give either: it filters by one team and caps at 100 markets. So v3 fixed *discovery* (the tool is now the first move), but the tool doesn't cover everything a coder needs. A possible v4: a mode that lists all events/team codes in a series.
-- Caveat: one run per version (n=1 each); the v1→v3 difference is clear, but this isn't a statistic.
-- Summary table:
+I added CAN’T VERIFY and a DO YOURSELF checklist for external requirements, required implementation evidence instead of README claims, and added explicit instructions never to open .env* files or print secret values.
+
+The rerun classified external items as CAN’T VERIFY, cited CSS for phone support, and redacted the secret-search output. It still returned NOT READY, but for documented unfinished work: the demo TODO and prompt-log placeholders. The rerun showed improvement, although one successful run is not proof that every future secret-handling case is safe.
+
+Evidence: `transcripts/v1-thesharp-checker.md` (secrets redacted) and `transcripts/rerun-skill-v2-thesharp-checker.md`.
+
+## Failure 3: The MCP tool was ignored during coding
+
+The initial Q&A test showed that the agent could call the tool, but it first confused the Bills with Baltimore by using BAL. During the actual coding task, the worker made no MCP calls at all. It tried curl, which was blocked by permissions, then wrote its own urllib requests.
+
+My first diagnosis was that the tool description focused too much on looking up odds and that its simplified output left out fields needed for coding. In v2, I made the description explicitly say to call the tool before writing Kalshi code, added raw: true, and added nickname mapping such as Bills → BUF.
+
+The first rerun was invalid because the clone included the old implementation branch, allowing the worker to merge existing code. I repeated it using a single-branch clone with no remote. That clean v2 run still attempted curl three times (all blocked) before finding the tool, although it then made four MCP calls.
+
+The deeper issue was discovery. The recorded setup deferred MCP tool descriptions until ToolSearch, so my improved description was unavailable when the agent chose its initial approach. In v3, I moved the routing instruction into server-level instructions. After reading the repository and SPEC, the fresh worker searched for the tool and made three calls before trying anything else. Afterward it still tried one curl (blocked) and wrote urllib probes to list every team code, which the tool cannot provide. Each version was run once, so this is one run per version, not a statistic.
+
+Evidence: `transcripts/01-mcp-call-check.md`, `transcripts/run1-worker.md`, `transcripts/rerun-mcp-v2-clean-worker.md`, `transcripts/rerun-mcp-v3-worker.md`.
 
 | Version | Change | kalshi_lookup calls | curl/urllib probes before it |
 |---|---|---|---|
