@@ -41,7 +41,8 @@ FACTS:
   - Clean v2 rerun (`transcripts/rerun-mcp-v2-clean-worker.md`): it **still went to `curl` first** (3 attempts, all blocked by permissions) and only then searched for and used `kalshi_lookup` (4 calls, `raw: true`). So the better description helped once the agent looked, but it didn't make the agent look.
 - **Real diagnosis:** the session's init event lists the tool next to `ToolSearch`. Claude Code **defers MCP tools**: the model sees only the name `mcp__kalshi-lookup__kalshi_lookup` until it runs ToolSearch, so **my description never reached the model when it decided how to start**. Rewriting the docstring couldn't fix discovery.
 - **Change (v3):** added server-level `instructions` to the `McpServer` constructor ("Whenever a task involves Kalshi … call kalshi_lookup before using curl, urllib, or memory"). Claude Code always puts server instructions in the system prompt.
-- **Rerun of v3** (`transcripts/rerun-mcp-v3-worker.md`), same prompt, clean clone, fresh Opus: after `ls`/`cat SPEC.md`, its **first action was ToolSearch → `kalshi_lookup`**, with 3 calls (`KXNFLGAME`/`KXNFLSPREAD`/`KXNFLTOTAL`, `contains: "BUF"`, `raw: true`) and **zero curl attempts**.
+- **Rerun of v3** (`transcripts/rerun-mcp-v3-worker.md`), same prompt, clean clone, fresh Opus: after `ls`/`cat SPEC.md`, its **first action was ToolSearch → `kalshi_lookup`**, with 3 calls (`KXNFLGAME`/`KXNFLSPREAD`/`KXNFLTOTAL`, `contains: "BUF"`, `raw: true`), before any curl or urllib.
+- **But it still went back to the raw API afterward:** 1 blocked curl, then several `urllib` probes. It said why: "I'm checking which team codes Kalshi uses before I write snapshot.py." It wanted the full list of all 32 team codes and complete event data (`limit=1000`), and the tool can't give either: it filters by one team and caps at 100 markets. So v3 fixed *discovery* (the tool is now the first move), but the tool doesn't cover everything a coder needs. A possible v4: a mode that lists all events/team codes in a series.
 - Caveat: one run per version (n=1 each); the v1→v3 difference is clear, but this isn't a statistic.
 - Summary table:
 
@@ -49,4 +50,4 @@ FACTS:
 |---|---|---|---|
 | v1 | original | 0 | all of them (urllib) |
 | v2 | coding-first description, `raw`, nicknames | 4 | 3 blocked curls first |
-| v3 | + server `instructions` | 3 (first action) | 0 |
+| v3 | + server `instructions` | 3 (first action) | 0 before; 1 curl + urllib probes after, for data the tool lacks |
